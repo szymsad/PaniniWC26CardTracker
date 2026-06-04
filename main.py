@@ -56,17 +56,20 @@ def main():
                 print("Usunięto.")
 
             case "show":
-                card = get_card(int(parts[1]))
-
-                if card:
-                    print(
-                        f"#{card[0]} | "
-                        f"{card[1]} | "
-                        f"{card[2]} | "
-                        f"qty={card[3] or 0}"
-                    )
+                if parts[1][0] == '(':
+                    print("national team of" + parts[1])
                 else:
-                    print("Nie znaleziono.")
+                    card = get_card(int(parts[1]))
+
+                    if card:
+                        print(
+                            f"#{card[0]} | "
+                            f"{card[1]} | "
+                            f"{card[2]} | "
+                            f"qty={card[3] or 0}"
+                        )
+                    else:
+                        print("Nie znaleziono.")
 
             case "duplicates":
                 duplicates = get_duplicates()
