@@ -85,7 +85,7 @@ def main():
                 missing = get_missing()
 
                 for card in missing:
-                    print(f"{card[0]} | {card[1]}")
+                    print(f"{card[0]} | {card[1]} | {card[2]}")
 
             case "stats":
                 stats = get_stats()

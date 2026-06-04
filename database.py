@@ -149,7 +149,8 @@ def get_missing():
     cur.execute("""
     SELECT
         c.card_number,
-        c.card_name
+        c.card_name,
+        c.country
     FROM cards c
     LEFT JOIN collection col
         ON c.card_number = col.card_number
