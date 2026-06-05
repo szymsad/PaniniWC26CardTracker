@@ -163,3 +163,146 @@ def get_missing():
     conn.close()
 
     return rows
+
+
+def get_country(code):
+    if code[0] == '(' and code[4] == ')':
+        decoded = code[1:4]
+        countries_codes = {
+            "ALG": "Algeria",
+            "ARG": "Argentina",
+            "AUS": "Australia",
+            "AUT": "Austria",
+            "BEL": "Belgium",
+            "BRA": "Brazil",
+            "CAN": "Canada",
+            "CPV": "Cape Verde",
+            "COL": "Colombia",
+            "CIV": "Cote d'Ivoire",
+            "CRO": "Croatia",
+            "CUW": "Curacao",
+            "CZE": "Czechia",
+            "ECU": "Ecuador",
+            "EGY": "Egypt",
+            "ENG": "England",
+            "FRA": "France",
+            "GER": "Germany",
+            "GHA": "Ghana",
+            "HAI": "Haiti",
+            "IRN": "Iran",
+            "IRQ": "Iraq",
+            "JPN": "Japan",
+            "JOR": "Jordan",
+            "KOR": "South Korea",
+            "MAR": "Morocco",
+            "MEX": "Mexico",
+            "NED": "Netherlands",
+            "NOR": "Norway",
+            "NZL": "New Zealand",
+            "PAN": "Panama",
+            "PAR": "Paraguay",
+            "POR": "Portugal",
+            "QAT": "Qatar",
+            "KSA": "Saudi Arabia",
+            "SCO": "Scotland",
+            "SEN": "Senegal",
+            "RSA": "South Africa",
+            "ESP": "Spain",
+            "SWE": "Sweden",
+            "SUI": "Switzerland",
+            "TUN": "Tunisia",
+            "TUR": "Turkey",
+            "USA": "United States",
+            "URU": "Uruguay",
+            "UZB": "Uzbekistan",
+
+            # Contender nations z checklisty
+            "DEN": "Denmark",
+            "ITA": "Italy",
+            "JAM": "Jamaica",
+            "POL": "Poland",
+        }
+        return countries_codes[decoded]
+    else:
+        countries = [
+            "Algeria",
+            "Argentina",
+            "Australia",
+            "Austria",
+            "Belgium",
+            "Brazil",
+            "Canada",
+            "Cape Verde",
+            "Colombia",
+            "Cote d'Ivoire",
+            "Croatia",
+            "Curacao",
+            "Czechia",
+            "Denmark",
+            "Ecuador",
+            "Egypt",
+            "England",
+            "France",
+            "Germany",
+            "Ghana",
+            "Haiti",
+            "Iran",
+            "Iraq",
+            "Italy",
+            "Jamaica",
+            "Japan",
+            "Jordan",
+            "South Korea",
+            "Saudi Arabia",
+            "Morocco",
+            "Mexico",
+            "Netherlands",
+            "Norway",
+            "New Zealand",
+            "Panama",
+            "Paraguay",
+            "Poland",
+            "Portugal",
+            "Qatar",
+            "Scotland",
+            "Senegal",
+            "South Africa",
+            "Spain",
+            "Switzerland",
+            "Sweden",
+            "Tunisia",
+            "Turkey",
+            "Uruguay",
+            "United States",
+            "Uzbekistan"
+        ]
+        code = code.lower().title()
+        if code in countries:
+            return code
+    return "wrong code/country"
+
+def get_list_country(code):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    country = get_country(code)
+
+    cur.execute("""
+        SELECT
+            c.card_number,
+            c.card_name,
+            c.country,
+            col.quantity
+        FROM cards c
+        JOIN collection col
+            ON c.card_number = col.card_number
+        WHERE c.country = ?
+          AND col.quantity > 0
+          AND c.category = "National Team"
+        ORDER BY c.card_number
+    """, (country,))
+
+    rows = cur.fetchall()
+    conn.close()
+
+    return rows

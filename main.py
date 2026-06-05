@@ -5,7 +5,8 @@ from database import (
     get_card,
     get_duplicates,
     get_stats,
-    get_missing
+    get_missing,
+    get_list_country
 )
 
 
@@ -56,9 +57,7 @@ def main():
                 print("Usunięto.")
 
             case "show":
-                if parts[1][0] == '(':
-                    print("national team of" + parts[1])
-                else:
+                if parts[1].isnumeric() :
                     card = get_card(int(parts[1]))
 
                     if card:
@@ -70,6 +69,13 @@ def main():
                         )
                     else:
                         print("Nie znaleziono.")
+                else:
+                    cards = get_list_country(parts[1])
+                    #print(f"Posiadane: {cards.count()}")
+                    #print(f"Brakujące: {11-cards.count()}")
+                    #print(f"Ukończenie: {cards.count()/11.0}%")
+                    for card in cards:
+                        print(f"{card[0]} | {card[1]} | {card[2]}")
 
             case "duplicates":
                 duplicates = get_duplicates()
