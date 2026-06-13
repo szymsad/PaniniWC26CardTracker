@@ -3,6 +3,8 @@ import sqlite3
 
 DB_NAME = "cards.db"
 
+special = {0: "FF", 1: "", 2: "ICON"}
+
 
 def get_connection():
     return sqlite3.connect(DB_NAME)
@@ -193,7 +195,7 @@ def get_country(code):
             "IRQ": "Iraq",
             "JPN": "Japan",
             "JOR": "Jordan",
-            "KOR": "South Korea",
+            "KOR": "Korea Republic",
             "MAR": "Morocco",
             "MEX": "Mexico",
             "NED": "Netherlands",
@@ -252,7 +254,7 @@ def get_country(code):
             "Jamaica",
             "Japan",
             "Jordan",
-            "South Korea",
+            "Korea Republic",
             "Saudi Arabia",
             "Morocco",
             "Mexico",
@@ -281,26 +283,81 @@ def get_country(code):
             return code
     return "wrong code/country"
 
-def get_list_country(code):
+
+def get_country_stats(code: str):
     conn = get_connection()
     cur = conn.cursor()
-
     country = get_country(code)
+    if country == "wrong code/country":
+        return 0
+    cur.execute("""
+    SELECT COUNT(*)
+    FROM cards c
+    LEFT JOIN collection col ON c.card_number = col.card_number
+    WHERE c.country = ? AND c.category = 'National Team'
+    """, (country,))
+    total = cur.fetchone()[0]
+
+    cur.execute("""
+    SELECT COUNT(*)
+    FROM cards c
+    JOIN collection col ON c.card_number = col.card_number
+    WHERE c.country = ? AND col.quantity > 0 AND c.category = 'National Team'
+    """, (country,))
+    owned = cur.fetchone()[0]
+
+    conn.close()
+
+    if total == 0:
+        return None
+
+    return {
+        "country": country,
+        "owned": owned,
+        "missing": total - owned,
+        "total": total,
+        "percentage": round((owned / total) * 100, 2)
+    }
+
+
+def get_cards_by_country(code: str):
+    conn = get_connection()
+    cur = conn.cursor()
+    country = get_country(code)
+
+    if country == "wrong code/country":
+        return 0
+    cur.execute("""
+    SELECT
+        c.card_number,
+        c.card_name,
+        col.quantity
+    FROM cards c
+    LEFT JOIN collection col ON c.card_number = col.card_number
+    WHERE c.country = ? AND c.category = 'National Team'
+    ORDER BY c.card_number
+    """, (country,))
+
+    rows = cur.fetchall()
+    conn.close()
+
+    return rows
+
+
+def get_owned_cards():
+    conn = get_connection()
+    cur = conn.cursor()
 
     cur.execute("""
         SELECT
             c.card_number,
             c.card_name,
-            c.country,
             col.quantity
         FROM cards c
-        JOIN collection col
-            ON c.card_number = col.card_number
-        WHERE c.country = ?
-          AND col.quantity > 0
-          AND c.category = "National Team"
+        LEFT JOIN collection col ON c.card_number = col.card_number
+        WHERE col.quantity > 0  
         ORDER BY c.card_number
-    """, (country,))
+        """, ())
 
     rows = cur.fetchall()
     conn.close()

@@ -6,7 +6,10 @@ from database import (
     get_duplicates,
     get_stats,
     get_missing,
-    get_list_country
+    get_cards_by_country,
+    get_country_stats,
+    get_owned_cards,
+    special
 )
 
 
@@ -17,6 +20,7 @@ Komendy:
 add <nr>
 remove <nr>
 
+show owned
 show <nr>
 show (NAT) - nationality 3 letters
 
@@ -45,10 +49,14 @@ def main():
         match parts[0]:
 
             case "add":
+                stats = get_stats()
+                count = stats["owned"]
                 for num in parts[1:]:
                     add_card(int(num))
 
-                print("Dodano.")
+                stats = get_stats()
+                count = stats['owned'] - count
+                print(f"Dodano. {count} nowych kart")
 
             case "remove":
                 for num in parts[1:]:
@@ -57,7 +65,14 @@ def main():
                 print("Usunięto.")
 
             case "show":
-                if parts[1].isnumeric() :
+                if parts[1] == "owned":
+                    cards = get_owned_cards()
+                    for i, card in enumerate(cards):
+                        label = special.get(i, "")
+                        suffix = f" [{label}]" if label else ""
+                        qty = card[2] or 0
+                        print(f"{card[0]:<4} | {card[1]:<24} | sztuk={qty}")
+                elif parts[1].isnumeric():
                     card = get_card(int(parts[1]))
 
                     if card:
@@ -70,12 +85,23 @@ def main():
                     else:
                         print("Nie znaleziono.")
                 else:
-                    cards = get_list_country(parts[1])
-                    #print(f"Posiadane: {cards.count()}")
-                    #print(f"Brakujące: {11-cards.count()}")
-                    #print(f"Ukończenie: {cards.count()/11.0}%")
-                    for card in cards:
-                        print(f"{card[0]} | {card[1]} | {card[2]}")
+                    arg = " ".join(parts[1:])
+                    cards = get_cards_by_country(arg)
+                    stats = get_country_stats(arg)
+                    if cards == 0:
+                        print("wrong code/country")
+                    else:
+                        print(f"Posiadane: {stats['owned']}")
+                        print(f"Brakujące: {stats['missing']}")
+                        print(f"Ukończenie: {stats['percentage']}%")
+                        print(f"Wszystkich kart: {stats['total']}")
+
+                        for i, card in enumerate(cards):
+                            label = special.get(i, "")
+                            suffix = f" [{label}]" if label else ""
+                            qty = card[2] or 0
+                            name_with_suffix = f"{card[1]}{suffix}"
+                            print(f"{card[0]:<4} | {name_with_suffix:<28} | sztuk={qty}")
 
             case "duplicates":
                 duplicates = get_duplicates()
