@@ -108,6 +108,7 @@ def get_duplicates():
     SELECT
         c.card_number,
         c.card_name,
+        c.category,
         col.quantity
     FROM collection col
     JOIN cards c
@@ -160,7 +161,8 @@ def get_missing():
     SELECT
         c.card_number,
         c.card_name,
-        c.country
+        c.category,
+        col.quantity
     FROM cards c
     LEFT JOIN collection col
         ON c.card_number = col.card_number

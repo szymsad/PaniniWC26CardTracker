@@ -32,6 +32,13 @@ exit
 """)
 
 
+def print_card(card, duplicate=False):
+    if duplicate:
+        print(f"{card[0]:<3} | {card[1]:<24} | {card[2]:<18} | sztuk={card[3]-1}")
+    else:
+        print(f"{card[0]:<3} | {card[1]:<24} | {card[2]:<18} | sztuk={card[3] or 0}")
+
+
 def main():
     initialize_database()
 
@@ -68,7 +75,7 @@ def main():
                     print("Żadna karta nie była nowa.")
                 print(f"Dodano: {len(duplicate_cards)} duplikatów")
                 for card in duplicate_cards:
-                    print(f"  {card[0]:<4} | {card[1]}")
+                    print_card(card)
 
             case "remove":
                 for num in parts[1:]:
@@ -79,23 +86,17 @@ def main():
             case "show":
                 if parts[1] == "owned":
                     cards = get_owned_cards()
-                    for i, card in enumerate(cards):
-                        label = special.get(i, "")
-                        suffix = f" [{label}]" if label else ""
-                        qty = card[2] or 0
-                        print(f"{card[0]:<4} | {card[1]:<24} | sztuk={qty}")
-                elif parts[1].isnumeric():
-                    card = get_card(int(parts[1]))
+                    for card in enumerate(cards):
+                        print_card(card)
 
-                    if card:
-                        print(
-                            f"#{card[0]} | "
-                            f"{card[1]} | "
-                            f"{card[2]} | "
-                            f"qty={card[3] or 0}"
-                        )
-                    else:
-                        print("Nie znaleziono.")
+                elif parts[1].isnumeric():
+                    for num in parts[1:]:
+                        card = get_card(int(num))
+                        if card:
+                            print_card(card)
+                        else:
+                            print(f"#{num} — nie znaleziono.")
+
                 else:
                     arg = " ".join(parts[1:])
                     cards = get_cards_by_country(arg)
@@ -123,16 +124,13 @@ def main():
                     continue
 
                 for card in duplicates:
-                    print(
-                        f"{card[0]} | {card[1]} | "
-                        f"sztuk: {card[2]-1}"
-                    )
+                    print_card(card, duplicate=True)
 
             case "missing":
                 missing = get_missing()
 
                 for card in missing:
-                    print(f"{card[0]} | {card[1]} | {card[2]}")
+                    print_card(card)
 
             case "stats":
                 stats = get_stats()
