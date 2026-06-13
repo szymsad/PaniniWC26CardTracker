@@ -49,14 +49,26 @@ def main():
         match parts[0]:
 
             case "add":
-                stats = get_stats()
-                count = stats["owned"]
+                new_cards = []
+                duplicate_cards = []
                 for num in parts[1:]:
-                    add_card(int(num))
+                    card_number = int(num)
+                    is_new = add_card(card_number)
+                    card = get_card(card_number)
+                    if is_new:
+                        new_cards.append(card)
+                    else:
+                        duplicate_cards.append(card)
 
-                stats = get_stats()
-                count = stats['owned'] - count
-                print(f"Dodano. {count} nowych kart")
+                if new_cards:
+                    print(f"Dodano: {len(new_cards)} nowych kart")
+                    for card in new_cards:
+                        print(f"  {card[0]:<4} | {card[1]}")
+                else:
+                    print("Żadna karta nie była nowa.")
+                print(f"Dodano: {len(duplicate_cards)} duplikatów")
+                for card in duplicate_cards:
+                    print(f"  {card[0]:<4} | {card[1]}")
 
             case "remove":
                 for num in parts[1:]:

@@ -36,19 +36,27 @@ def initialize_database():
     conn.close()
 
 
-def add_card(card_number: int):
+def add_card(card_number: int) -> bool:
+    """Zwraca True jeśli karta była nowa (przed dodaniem jej nie było)."""
     conn = get_connection()
     cur = conn.cursor()
 
     cur.execute("""
-    INSERT INTO collection(card_number, quantity)
-    VALUES(?, 1)
-    ON CONFLICT(card_number)
-    DO UPDATE SET quantity = quantity + 1
+        SELECT quantity FROM collection WHERE card_number = ?
+    """, (card_number,))
+    row = cur.fetchone()
+    was_new = row is None or row[0] == 0
+
+    cur.execute("""
+        INSERT INTO collection(card_number, quantity)
+        VALUES(?, 1)
+        ON CONFLICT(card_number)
+        DO UPDATE SET quantity = quantity + 1
     """, (card_number,))
 
     conn.commit()
     conn.close()
+    return was_new
 
 
 def remove_card(card_number: int):
