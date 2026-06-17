@@ -28,15 +28,17 @@ duplicates
 missing
 stats
 
-exit
-""")
+exit""")
 
 
-def print_card(card, duplicate=False):
+def print_card(card, duplicate=False, missing=False):
     if duplicate:
         print(f"{card[0]:<3} | {card[1]:<24} | {card[2]:<18} | sztuk={card[3]-1}")
+    elif missing:
+        print(f"{card[0]:<3} | {card[1]:<24} | {card[2]:<18}")
     else:
-        print(f"{card[0]:<3} | {card[1]:<24} | {card[2]:<18} | sztuk={card[3] or 0}")
+        qty_str = f"sztuk={card[3]}" if card[3] else "X"
+        print(f"{card[0]:<3} | {card[1]:<24} | {card[2]:<18} | {qty_str}")
 
 
 def main():
@@ -70,7 +72,7 @@ def main():
                 if new_cards:
                     print(f"Dodano: {len(new_cards)} nowych kart")
                     for card in new_cards:
-                        print(f"  {card[0]:<4} | {card[1]}")
+                        print_card(card)
                 else:
                     print("Żadna karta nie była nowa.")
                 print(f"Dodano: {len(duplicate_cards)} duplikatów")
@@ -86,7 +88,7 @@ def main():
             case "show":
                 if parts[1] == "owned":
                     cards = get_owned_cards()
-                    for card in enumerate(cards):
+                    for card in cards:
                         print_card(card)
 
                 elif parts[1].isnumeric():
@@ -109,12 +111,8 @@ def main():
                         print(f"Ukończenie: {stats['percentage']}%")
                         print(f"Wszystkich kart: {stats['total']}")
 
-                        for i, card in enumerate(cards):
-                            label = special.get(i, "")
-                            suffix = f" [{label}]" if label else ""
-                            qty = card[2] or 0
-                            name_with_suffix = f"{card[1]}{suffix}"
-                            print(f"{card[0]:<4} | {name_with_suffix:<28} | sztuk={qty}")
+                        for card in cards:
+                            print_card(card)
 
             case "duplicates":
                 duplicates = get_duplicates()
@@ -130,7 +128,7 @@ def main():
                 missing = get_missing()
 
                 for card in missing:
-                    print_card(card)
+                    print_card(card, missing=True)
 
             case "stats":
                 stats = get_stats()
