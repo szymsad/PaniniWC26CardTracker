@@ -536,8 +536,7 @@ elif page == "📋 Posiadane":
         if "album_page" not in st.session_state:
             st.session_state.album_page = 1
 
-        def _on_page_input():
-            st.session_state.album_page = st.session_state._album_page_widget
+        # album_page — jedyne źródło prawdy; number_input czyta value= przy każdym rerunie
 
         # ── Pagination controls ──────────────────────────────────────────────
         col_prev, col_input, col_of, col_next = st.columns([1, 2, 2, 1])
@@ -545,17 +544,18 @@ elif page == "📋 Posiadane":
         with col_prev:
             if st.button("◀", use_container_width=True,
                          disabled=st.session_state.album_page <= 1):
-                st.session_state.album_page -= 1
+                st.session_state.album_page = max(1, st.session_state.album_page - 1)
                 st.rerun()
 
         with col_input:
-            st.number_input(
+            entered = st.number_input(
                 "Strona", min_value=1, max_value=total_pages,
                 value=st.session_state.album_page,
                 step=1, label_visibility="collapsed",
-                key="_album_page_widget",
-                on_change=_on_page_input,
             )
+            if entered != st.session_state.album_page:
+                st.session_state.album_page = int(entered)
+                st.rerun()
 
         with col_of:
             st.markdown(
@@ -566,7 +566,7 @@ elif page == "📋 Posiadane":
         with col_next:
             if st.button("▶", use_container_width=True,
                          disabled=st.session_state.album_page >= total_pages):
-                st.session_state.album_page += 1
+                st.session_state.album_page = min(total_pages, st.session_state.album_page + 1)
                 st.rerun()
 
         # ── Render grid ──────────────────────────────────────────────────────
