@@ -313,8 +313,9 @@ def show_country_detail(code: str):
 
 # ─── Sidebar ──────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("## ⚽ WC 2026")
-    st.markdown("**Kolekcja naklejek**")
+    st.markdown("## ⚽ FIFA World Cup 2026")
+    st.markdown("**Kolekcja kart**")
+    st.markdown("**PANINI**")
     st.divider()
 
     page = st.radio(
@@ -527,57 +528,108 @@ elif page == "📋 Posiadane":
         owned_count = sum(1 for c in all_cards if (c[3] or 0) > 0)
         st.markdown(f"Posiadane: **{owned_count}** / {len(all_cards)} kart")
 
-        PAGE_SIZE   = 9
-        total_pages = (len(all_cards) + PAGE_SIZE - 1) // PAGE_SIZE
+        PAGE_SIZE = 9
+        # Obliczamy całkowitą liczbę pojedynczych stron
+        total_single_pages = (len(all_cards) + PAGE_SIZE - 1) // PAGE_SIZE
 
-        # Strzałki modyfikują `album_page` (zwykły int w session_state).
-        # number_input dostaje value= z tego klucza i zapisuje zmiany przez on_change.
-        # Dzięki temu nigdy nie dotykamy klucza widgetu bezpośrednio.
-        if "album_page" not in st.session_state:
-            st.session_state.album_page = 1
+        # Obliczamy liczbę "widoków" (rozkładówek).
+        # Strona 1 to widok 1. Każdy kolejny widok mieści 2 strony.
+        if total_single_pages <= 1:
+            total_views = 1
+        else:
+            total_views = 1 + (total_single_pages - 1 + 1) // 2
 
-        # album_page — jedyne źródło prawdy; number_input czyta value= przy każdym rerunie
+        if "album_view" not in st.session_state:
+            st.session_state.album_view = 1
 
-        # ── Pagination controls ──────────────────────────────────────────────
+        # ── Kontrola nawigacji (Widoki/Rozkładówki) ───────────────────────────
         col_prev, col_input, col_of, col_next = st.columns([1, 2, 2, 1])
 
         with col_prev:
             if st.button("◀", use_container_width=True,
-                         disabled=st.session_state.album_page <= 1):
-                st.session_state.album_page = max(1, st.session_state.album_page - 1)
+                         disabled=st.session_state.album_view <= 1):
+                st.session_state.album_view = max(1, st.session_state.album_view - 1)
                 st.rerun()
 
         with col_input:
             entered = st.number_input(
-                "Strona", min_value=1, max_value=total_pages,
-                value=st.session_state.album_page,
+                "Rozkładówka", min_value=1, max_value=total_views,
+                value=st.session_state.album_view,
                 step=1, label_visibility="collapsed",
             )
-            if entered != st.session_state.album_page:
-                st.session_state.album_page = int(entered)
+            if entered != st.session_state.album_view:
+                st.session_state.album_view = int(entered)
                 st.rerun()
 
         with col_of:
             st.markdown(
-                f'<div style="padding:6px 4px;font-size:.85rem;color:#64748b">z {total_pages}</div>',
+                f'<div style="padding:6px 4px;font-size:.85rem;color:#64748b">z {total_views}</div>',
                 unsafe_allow_html=True,
             )
 
         with col_next:
             if st.button("▶", use_container_width=True,
-                         disabled=st.session_state.album_page >= total_pages):
-                st.session_state.album_page = min(total_pages, st.session_state.album_page + 1)
+                         disabled=st.session_state.album_view >= total_views):
+                st.session_state.album_view = min(total_views, st.session_state.album_view + 1)
                 st.rerun()
 
-        # ── Render grid ──────────────────────────────────────────────────────
-        cur_page = int(st.session_state.album_page)
-        start    = (cur_page - 1) * PAGE_SIZE
-        chunk    = list(all_cards[start : start + PAGE_SIZE])
-        render_album_page(chunk, cur_page)
+        # ── Logika wyznaczania stron dla danego widoku ───────────────────────
+        cur_view = int(st.session_state.album_view)
 
-        first_num = all_cards[start][0]
-        last_num  = all_cards[min(start + PAGE_SIZE - 1, len(all_cards) - 1)][0]
-        st.caption(f"Karty #{first_num}–#{last_num}")
+        if cur_view == 1:
+            # Pierwszy widok: tylko jedna strona po prawej
+            pages_to_show = [1]
+        else:
+            # Kolejne widoki: np. widok 2 -> strony 2 i 3, widok 3 -> strony 4 i 5
+            left_page = (cur_view - 1) * 2
+            right_page = left_page + 1
+            pages_to_show = [left_page, right_page]
+
+        # Tworzymy dwie kolumny w Streamlicie dla lewej i prawej strony
+        col_left_page, col_right_page = st.columns(2)
+
+        first_card_idx = None
+        last_card_idx = None
+
+        # Renderowanie stron w układzie książkowym
+        if cur_view == 1:
+            # Pierwsza strona ląduje po prawej stronie, lewa zostaje pusta (okładka)
+            with col_right_page:
+                start = 0
+                chunk = list(all_cards[start: start + PAGE_SIZE])
+                if chunk:
+                    render_album_page(chunk, 1)
+                    first_card_idx = chunk[0][0]
+                    last_card_idx = chunk[-1][0]
+        else:
+            # Lewa strona rozkładówki
+            p_left = pages_to_show[0]
+            with col_left_page:
+                start_l = (p_left - 1) * PAGE_SIZE
+                chunk_l = list(all_cards[start_l: start_l + PAGE_SIZE])
+                if chunk_l:
+                    render_album_page(chunk_l, p_left)
+                    if first_card_idx is None:
+                        first_card_idx = chunk_l[0][0]
+                    last_card_idx = chunk_l[-1][0]
+                else:
+                    st.write("")  # Pusta strona jeśli brak kart
+
+            # Prawa strona rozkładówki
+            p_right = pages_to_show[1]
+            if p_right <= total_single_pages:
+                with col_right_page:
+                    start_r = (p_right - 1) * PAGE_SIZE
+                    chunk_r = list(all_cards[start_r: start_r + PAGE_SIZE])
+                    if chunk_r:
+                        render_album_page(chunk_r, p_right)
+                        if first_card_idx is None:
+                            first_card_idx = chunk_r[0][0]
+                        last_card_idx = chunk_r[-1][0]
+
+        # Stopka informacyjna o zakresie kart na ekranie
+        if first_card_idx is not None and last_card_idx is not None:
+            st.caption(f"Karty #{first_card_idx}–#{last_card_idx}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
