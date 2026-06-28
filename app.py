@@ -1,5 +1,10 @@
 import streamlit as st
 import pandas as pd
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
+import pathlib
 from database import (
     initialize_database,
     add_card,
@@ -116,7 +121,7 @@ html, body,
 .badge-icon { background:#fef9c3; color:#854d0e; }
 .badge-hero { background:#f3e8ff; color:#7e22ce; }
 .badge-rookie { background:#ffe4e6; color:#be123c; }
-.badge-fav    { background:#ffedd5; color:#c2410c; }
+.badge-fav     { background:#ffedd5; color:#c2410c; }
 .badge-eternal { background:#e0f2fe; color:#0369a1; }
 
 /* qty bubble */
@@ -181,6 +186,34 @@ div[data-testid="stButton"] button { border-radius:7px; font-weight:600; }
 # ─── Init DB ──────────────────────────────────────────────────────────────────
 initialize_database()
 
+# ─── Config (hasło) ──────────────────────────────────────────────────────────
+_CONFIG_PATH = pathlib.Path(__file__).parent / "config.toml"
+try:
+    with open(_CONFIG_PATH, "rb") as _f:
+        _CONFIG = tomllib.load(_f)
+    _PASSWORD = _CONFIG.get("auth", {}).get("password", "")
+except FileNotFoundError:
+    _PASSWORD = ""
+
+
+def _check_add_remove_auth() -> bool:
+    if not _PASSWORD:
+        return True
+    return st.session_state.get("add_remove_auth", False)
+
+
+def _render_password_gate():
+    st.title("➕ Dodaj / Usuń karty")
+    st.warning("🔒 Ta sekcja jest chroniona hasłem.")
+    pwd = st.text_input("Hasło", type="password", key="_add_remove_pwd_input")
+    if st.button("Odblokuj"):
+        if pwd == _PASSWORD:
+            st.session_state.add_remove_auth = True
+            st.rerun()
+        else:
+            st.error("Nieprawidłowe hasło.")
+
+
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
 def pct_bar(pct: float) -> str:
@@ -192,10 +225,10 @@ def pct_bar(pct: float) -> str:
 
 TYPE_BADGE = {
     "Fan Favourite": '<span class="card-type-badge badge-fav">Fan Fav</span>',
-    "Icon":          '<span class="card-type-badge badge-icon">Icon</span>',
-    "Hero":          '<span class="card-type-badge badge-hero">Hero</span>',
+    "Icon": '<span class="card-type-badge badge-icon">Icon</span>',
+    "Hero": '<span class="card-type-badge badge-hero">Hero</span>',
     "Master Rookie": '<span class="card-type-badge badge-rookie">Rookie</span>',
-    "Eternos":       '<span class="card-type-badge badge-eternal">Eternos</span>',
+    "Eternos": '<span class="card-type-badge badge-eternal">Eternos</span>',
 }
 
 COUNTRY_SPECIAL = {
@@ -212,9 +245,18 @@ def card_type_badge(category: str) -> str:
     return ""
 
 
+def get_integrated_card_badge(card_id: int, category: str) -> str:
+    if 10 <= card_id <= 513:
+        remainder = card_id % 12
+        remainder_to_special_key = {10: 0, 11: 1, 0: 2}
+        if remainder in remainder_to_special_key:
+            target_key = remainder_to_special_key[remainder]
+            return COUNTRY_SPECIAL[target_key]
+    return card_type_badge(category)
+
+
 @st.cache_data(ttl=5)
 def get_all_cards_for_album():
-    """Return all catalog cards (owned + missing) ordered by card_number."""
     from database import get_db, _CARD_COLUMNS, _CARD_JOIN
     with get_db() as conn:
         cur = conn.cursor()
@@ -223,24 +265,19 @@ def get_all_cards_for_album():
 
 
 def render_album_page(cards_on_page: list, page_num: int):
-    """Render one album page as a 3×3 HTML grid.
-    cards_on_page: list of DB tuples (num, name, cat, qty) OR None for empty slot.
-    """
     items_html = ""
     for card in cards_on_page:
         if card is None:
-            # true empty slot — shouldn't happen but guard anyway
             items_html += '<div class="album-card missing"><span class="card-number">—</span></div>'
             continue
         num, name, cat, qty = card[0], card[1], card[2] or "", card[3] or 0
         owned_cls = "owned" if qty > 0 else "missing"
-        badge = card_type_badge(cat)
+        badge = get_integrated_card_badge(num, cat)
         qty_html = ""
         if qty == 1:
             qty_html = '<span class="qty-bubble">✓</span>'
         elif qty > 1:
             qty_html = f'<span class="qty-bubble dup">×{qty}</span>'
-
         items_html += (
             f'<div class="album-card {owned_cls}">'
             f'  {qty_html}'
@@ -249,13 +286,10 @@ def render_album_page(cards_on_page: list, page_num: int):
             f'  {badge}'
             f'</div>'
         )
-
-    # pad last row to fill 3 cols
     remainder = len(cards_on_page) % 3
     if remainder:
         for _ in range(3 - remainder):
             items_html += '<div></div>'
-
     st.markdown(
         f'<div class="album-page-title">Strona {page_num}</div>'
         f'<div class="album-grid">{items_html}</div>',
@@ -264,7 +298,6 @@ def render_album_page(cards_on_page: list, page_num: int):
 
 
 def render_country_cards(cards: list):
-    """Render country card list with special-type labels for first 3."""
     html = ""
     for idx, r in enumerate(cards):
         num, name, cat, qty = r[0], r[1], r[2] or "", r[3] or 0
@@ -284,9 +317,8 @@ def render_country_cards(cards: list):
 
 
 def show_country_detail(code: str):
-    """Render full country breakdown — reused in Kraje page and Stats click."""
     cards = get_cards_by_country(code)
-    cs    = get_country_stats(code)
+    cs = get_country_stats(code)
     if cards == 0 or not cs:
         st.error("Nie znaleziono kraju.")
         return
@@ -307,7 +339,7 @@ def show_country_detail(code: str):
     c1, c2, c3 = st.columns(3)
     c1.metric("✅ Posiadane", cs["owned"])
     c2.metric("❌ Brakujące", cs["missing"])
-    c3.metric("📦 Łącznie",  cs["total"])
+    c3.metric("📦 Łącznie", cs["total"])
     render_country_cards(cards)
 
 
@@ -326,12 +358,11 @@ with st.sidebar:
 
     st.divider()
     stats = get_stats()
-    pct   = stats["percentage"]
+    pct = stats["percentage"]
     st.markdown("**Ukończenie albumu**")
     st.markdown(pct_bar(pct), unsafe_allow_html=True)
     st.markdown(f"<small style='color:#64748b'>{stats['owned']} / 630 · {pct}%</small>",
                 unsafe_allow_html=True)
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PAGE: STATYSTYKI
@@ -341,9 +372,9 @@ if page == "📊 Statystyki":
 
     c1, c2, c3, c4 = st.columns(4)
     for col, label, val, color in [
-        (c1, "Posiadane",  stats["owned"],     "#2563eb"),
-        (c2, "Brakujące",  stats["missing"],   "#dc2626"),
-        (c3, "Ukończenie", f"{pct}%",          "#16a34a"),
+        (c1, "Posiadane", stats["owned"], "#2563eb"),
+        (c2, "Brakujące", stats["missing"], "#dc2626"),
+        (c3, "Ukończenie", f"{pct}%", "#16a34a"),
         (c4, "Wszystkich", stats["all cards"], "#d97706"),
     ]:
         col.markdown(
@@ -370,7 +401,7 @@ if page == "📊 Statystyki":
 
     if country_rows:
         df_c = pd.DataFrame(country_rows).sort_values("%", ascending=False)
-        sel  = st.dataframe(
+        sel = st.dataframe(
             df_c, use_container_width=True, hide_index=True,
             on_select="rerun", selection_mode="single-row",
             column_config={
@@ -391,6 +422,9 @@ if page == "📊 Statystyki":
 # PAGE: DODAJ / USUŃ
 # ═══════════════════════════════════════════════════════════════════════════════
 elif page == "➕ Dodaj / Usuń":
+    if not _check_add_remove_auth():
+        _render_password_gate()
+        st.stop()
     st.title("➕ Dodaj / Usuń karty")
 
     col_add, col_rem = st.columns(2)
@@ -407,7 +441,7 @@ elif page == "➕ Dodaj / Usuń":
                         num = int(tok)
                         if 1 <= num <= 630:
                             is_new = add_card(num)
-                            card   = get_card(num)
+                            card = get_card(num)
                             (new_cards if is_new else dup_cards).append(card)
                         else:
                             errors.append(tok)
@@ -435,7 +469,7 @@ elif page == "➕ Dodaj / Usuń":
                 removed = []
                 for tok in raw:
                     if tok.isdigit():
-                        num  = int(tok)
+                        num = int(tok)
                         card = get_card(num)
                         remove_card(num)
                         if card:
@@ -453,7 +487,7 @@ elif page == "➕ Dodaj / Usuń":
     if st.button("Sprawdź"):
         card = get_card(int(lookup))
         if card:
-            qty    = card[3] or 0
+            qty = card[3] or 0
             status = "✅ Posiadana" if qty > 0 else "❌ Brakująca"
             st.markdown(f"**#{card[0]}** · {card[1]}  \n"
                         f"Kategoria: `{card[2]}`  \n"
@@ -468,7 +502,6 @@ elif page == "➕ Dodaj / Usuń":
 elif page == "🌍 Kraje":
     st.title("🌍 Karty krajowe")
 
-    # If a country was selected from the table, keep it in session state
     if "selected_country" not in st.session_state:
         st.session_state.selected_country = ""
 
@@ -486,7 +519,6 @@ elif page == "🌍 Kraje":
             st.rerun()
         show_country_detail(search)
     else:
-        # Show country table; clicking a row fills the search
         st.caption("Kliknij wiersz, aby zobaczyć karty danego kraju.")
         country_grid = []
         for code, name in COUNTRIES.items():
@@ -515,7 +547,7 @@ elif page == "🌍 Kraje":
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PAGE: POSIADANE — pełny album grid z pustymi miejscami, 9 kart / strona
+# PAGE: POSIADANE
 # ═══════════════════════════════════════════════════════════════════════════════
 elif page == "📋 Posiadane":
     st.title("📋 Album — podgląd kolekcji")
@@ -529,11 +561,8 @@ elif page == "📋 Posiadane":
         st.markdown(f"Posiadane: **{owned_count}** / {len(all_cards)} kart")
 
         PAGE_SIZE = 9
-        # Obliczamy całkowitą liczbę pojedynczych stron
         total_single_pages = (len(all_cards) + PAGE_SIZE - 1) // PAGE_SIZE
 
-        # Obliczamy liczbę "widoków" (rozkładówek).
-        # Strona 1 to widok 1. Każdy kolejny widok mieści 2 strony.
         if total_single_pages <= 1:
             total_views = 1
         else:
@@ -542,7 +571,6 @@ elif page == "📋 Posiadane":
         if "album_view" not in st.session_state:
             st.session_state.album_view = 1
 
-        # ── Kontrola nawigacji (Widoki/Rozkładówki) ───────────────────────────
         col_prev, col_input, col_of, col_next = st.columns([1, 2, 2, 1])
 
         with col_prev:
@@ -573,27 +601,21 @@ elif page == "📋 Posiadane":
                 st.session_state.album_view = min(total_views, st.session_state.album_view + 1)
                 st.rerun()
 
-        # ── Logika wyznaczania stron dla danego widoku ───────────────────────
         cur_view = int(st.session_state.album_view)
 
         if cur_view == 1:
-            # Pierwszy widok: tylko jedna strona po prawej
             pages_to_show = [1]
         else:
-            # Kolejne widoki: np. widok 2 -> strony 2 i 3, widok 3 -> strony 4 i 5
             left_page = (cur_view - 1) * 2
             right_page = left_page + 1
             pages_to_show = [left_page, right_page]
 
-        # Tworzymy dwie kolumny w Streamlicie dla lewej i prawej strony
         col_left_page, col_right_page = st.columns(2)
 
         first_card_idx = None
         last_card_idx = None
 
-        # Renderowanie stron w układzie książkowym
         if cur_view == 1:
-            # Pierwsza strona ląduje po prawej stronie, lewa zostaje pusta (okładka)
             with col_right_page:
                 start = 0
                 chunk = list(all_cards[start: start + PAGE_SIZE])
@@ -602,7 +624,6 @@ elif page == "📋 Posiadane":
                     first_card_idx = chunk[0][0]
                     last_card_idx = chunk[-1][0]
         else:
-            # Lewa strona rozkładówki
             p_left = pages_to_show[0]
             with col_left_page:
                 start_l = (p_left - 1) * PAGE_SIZE
@@ -613,9 +634,8 @@ elif page == "📋 Posiadane":
                         first_card_idx = chunk_l[0][0]
                     last_card_idx = chunk_l[-1][0]
                 else:
-                    st.write("")  # Pusta strona jeśli brak kart
+                    st.write("")
 
-            # Prawa strona rozkładówki
             p_right = pages_to_show[1]
             if p_right <= total_single_pages:
                 with col_right_page:
@@ -627,7 +647,6 @@ elif page == "📋 Posiadane":
                             first_card_idx = chunk_r[0][0]
                         last_card_idx = chunk_r[-1][0]
 
-        # Stopka informacyjna o zakresie kart na ekranie
         if first_card_idx is not None and last_card_idx is not None:
             st.caption(f"Karty #{first_card_idx}–#{last_card_idx}")
 
@@ -646,7 +665,7 @@ elif page == "❌ Brakujące":
         df = pd.DataFrame([{"#": r[0], "Nazwa": r[1], "Kategoria": r[2]} for r in missing])
 
         cats = ["Wszystkie"] + sorted(df["Kategoria"].dropna().unique().tolist())
-        cat_filter  = st.selectbox("Filtruj po kategorii", cats)
+        cat_filter = st.selectbox("Filtruj po kategorii", cats)
         search_name = st.text_input("Szukaj po nazwie", "")
 
         if cat_filter != "Wszystkie":
@@ -670,7 +689,7 @@ elif page == "🔁 Duplikaty":
         total_extra = sum(r[3] - 1 for r in duplicates)
         c1, c2 = st.columns(2)
         c1.metric("Rodzajów kart z duplikatem", len(duplicates))
-        c2.metric("Kart do wymiany łącznie",    total_extra)
+        c2.metric("Kart do wymiany łącznie", total_extra)
 
         st.markdown("<br>", unsafe_allow_html=True)
 
@@ -678,7 +697,7 @@ elif page == "🔁 Duplikaty":
         for r in duplicates:
             num, name, cat, qty = r[0], r[1], r[2] or "", r[3]
             extra = qty - 1
-            badge = card_type_badge(cat)
+            badge = get_integrated_card_badge(num, cat)
             html += (
                 f'<div class="dup-row">'
                 f'  <span style="font-size:.7rem;color:#94a3b8;width:28px;flex-shrink:0;font-weight:700">#{num}</span>'
