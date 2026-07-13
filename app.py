@@ -693,6 +693,34 @@ elif page == "🔁 Duplikaty":
 
         st.markdown("<br>", unsafe_allow_html=True)
 
+        # ── Eksport listy numerów ──────────────────────────────────────────
+        dup_numbers = [r[0] for r in duplicates]
+
+        exp_col1, exp_col2 = st.columns([1, 3])
+        with exp_col1:
+            export_format = st.selectbox(
+                "Format eksportu", ["TXT", "CSV"], label_visibility="collapsed",
+            )
+        with exp_col2:
+            if export_format == "CSV":
+                export_content = "card_number\n" + "\n".join(str(n) for n in dup_numbers) + "\n"
+                mime = "text/csv"
+                file_name = "duplicates.csv"
+            else:
+                export_content = "\n".join(str(n) for n in dup_numbers) + "\n"
+                mime = "text/plain"
+                file_name = "duplicates.txt"
+
+            st.download_button(
+                "⬇️ Pobierz listę numerów duplikatów",
+                data=export_content,
+                file_name=file_name,
+                mime=mime,
+                use_container_width=True,
+            )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
         html = ""
         for r in duplicates:
             num, name, cat, qty = r[0], r[1], r[2] or "", r[3]
