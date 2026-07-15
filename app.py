@@ -180,6 +180,18 @@ div[data-testid="stButton"] button { border-radius:7px; font-weight:600; }
 /* override Streamlit dark scrollbar / metric bg */
 [data-testid="metric-container"] { background:#f8fafc !important;
     border:1.5px solid #e2e8f0; border-radius:10px; padding:12px 16px; }
+
+/* ── Missing row + checkbox tracking ── */
+.miss-row {
+    display:flex; align-items:center; gap:10px;
+    padding:7px 12px; border-radius:6px; margin-bottom:4px;
+    background:#fff; border:1px solid #e2e8f0;
+    font-size:.85rem;
+}
+.miss-row.checked {
+    background:#eff6ff; border-color:#93c5fd;
+}
+.miss-row.checked .card-name-txt { text-decoration: line-through; color:#60a5fa; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -651,9 +663,6 @@ elif page == "📋 Posiadane":
             st.caption(f"Karty #{first_card_idx}–#{last_card_idx}")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# PAGE: BRAKUJĄCE
-# ═══════════════════════════════════════════════════════════════════════════════
 elif page == "❌ Brakujące":
     st.title("❌ Brakujące karty")
 
@@ -662,19 +671,85 @@ elif page == "❌ Brakujące":
         st.success("🎉 Album ukończony! Nie brakuje żadnej karty.")
     else:
         st.markdown(f"Brakujących kart: **{len(missing)}**")
-        df = pd.DataFrame([{"#": r[0], "Nazwa": r[1], "Kategoria": r[2]} for r in missing])
 
-        cats = ["Wszystkie"] + sorted(df["Kategoria"].dropna().unique().tolist())
+        cats = ["Wszystkie"] + sorted({r[2] for r in missing if r[2]})
         cat_filter = st.selectbox("Filtruj po kategorii", cats)
         search_name = st.text_input("Szukaj po nazwie", "")
 
+        filtered = missing
         if cat_filter != "Wszystkie":
-            df = df[df["Kategoria"] == cat_filter]
+            filtered = [r for r in filtered if r[2] == cat_filter]
         if search_name:
-            df = df[df["Nazwa"].str.contains(search_name, case=False, na=False)]
+            filtered = [r for r in filtered if search_name.lower() in (r[1] or "").lower()]
 
-        st.dataframe(df, hide_index=True, use_container_width=True)
+        # ── Eksport listy numerów ──────────────────────────────────────────
+        miss_numbers = [r[0] for r in filtered]
 
+        exp_col1, exp_col2 = st.columns([1, 3])
+        with exp_col1:
+            export_format = st.selectbox(
+                "Format eksportu", ["TXT", "CSV"],
+                label_visibility="collapsed", key="miss_export_fmt",
+            )
+        with exp_col2:
+            if export_format == "CSV":
+                export_content = "card_number\n" + "\n".join(str(n) for n in miss_numbers) + "\n"
+                mime = "text/csv"
+                file_name = "missing.csv"
+            else:
+                export_content = "\n".join(str(n) for n in miss_numbers) + "\n"
+                mime = "text/plain"
+                file_name = "missing.txt"
+
+            st.download_button(
+                "⬇️ Pobierz listę numerów brakujących",
+                data=export_content,
+                file_name=file_name,
+                mime=mime,
+                use_container_width=True,
+                disabled=not miss_numbers,
+            )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # ── Checkboxy ogłoszeń (tylko wizualne, w ramach sesji) ─────────────
+        if "missing_ad_checked" not in st.session_state:
+            st.session_state.missing_ad_checked = {}
+
+        checked_count = sum(
+            1 for r in filtered if st.session_state.missing_ad_checked.get(r[0], False)
+        )
+        c_info, c_toggle = st.columns([3, 1])
+        with c_info:
+            st.caption(f"📌 Widziane w ogłoszeniach: **{checked_count} / {len(filtered)}**")
+        with c_toggle:
+            view_as_table = st.toggle("Tabela", value=False, key="missing_table_toggle")
+
+        if view_as_table:
+            df = pd.DataFrame([{"#": r[0], "Nazwa": r[1], "Kategoria": r[2]} for r in filtered])
+            st.dataframe(df, hide_index=True, use_container_width=True)
+        else:
+            for r in filtered:
+                num, name, cat = r[0], r[1], r[2] or ""
+                col_chk, col_row = st.columns([0.06, 0.94])
+                with col_chk:
+                    checked = st.checkbox(
+                        "ogłoszenie", key=f"miss_chk_{num}",
+                        value=st.session_state.missing_ad_checked.get(num, False),
+                        label_visibility="collapsed",
+                    )
+                    st.session_state.missing_ad_checked[num] = checked
+                with col_row:
+                    row_cls = "miss-row checked" if checked else "miss-row"
+                    badge = get_integrated_card_badge(num, cat)
+                    st.markdown(
+                        f'<div class="{row_cls}">'
+                        f'  <span style="font-size:.7rem;color:#94a3b8;width:28px;flex-shrink:0;font-weight:700">#{num}</span>'
+                        f'  <span class="card-name-txt" style="flex:1;font-weight:600;color:#1e293b">{name}</span>'
+                        f'  {badge}'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PAGE: DUPLIKATY
